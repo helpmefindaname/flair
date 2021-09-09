@@ -1169,48 +1169,52 @@ class TransformerWordEmbeddings(TokenEmbeddings):
         if self.context_length > 0:
             self._infer_embeddings_from_context(original_sentences, sentences, context_offsets)
 
-    def _expand_sentence_with_context(self, sentence):
+    def _expand_sentence_with_context(self, sentence: Sentence):
 
         # remember original sentence
         original_sentence = sentence
 
         import random
-        expand_context = False if self.training and random.randint(1, 100) <= (self.context_dropout * 100) else True
+        expand_context = random.randint(1, 100) > (self.context_dropout * 100) or not self.training
 
         left_context = ''
         right_context = ''
 
         if expand_context:
 
-            # get left context
-            while True:
-                sentence = sentence.previous_sentence()
-                if sentence is None: break
+            if hasattr(sentence, "right_context") and hasattr(sentence, "left_context"):
+                left_context = sentence.left_context
+                right_context = sentence.right_context
+            else:
+                # get left context
+                while True:
+                    sentence = sentence.previous_sentence()
+                    if sentence is None: break
 
-                if self.respect_document_boundaries and sentence.is_document_boundary: break
+                    if self.respect_document_boundaries and sentence.is_document_boundary: break
 
-                left_context = sentence.to_tokenized_string() + ' ' + left_context
-                left_context = left_context.strip()
-                if len(left_context.split(" ")) > self.context_length:
-                    left_context = " ".join(left_context.split(" ")[-self.context_length:])
-                    break
-            original_sentence.left_context = left_context
+                    left_context = sentence.to_tokenized_string() + ' ' + left_context
+                    left_context = left_context.strip()
+                    if len(left_context.split(" ")) > self.context_length:
+                        left_context = " ".join(left_context.split(" ")[-self.context_length:])
+                        break
+                original_sentence.left_context = left_context
 
-            sentence = original_sentence
+                sentence = original_sentence
 
-            # get right context
-            while True:
-                sentence = sentence.next_sentence()
-                if sentence is None: break
-                if self.respect_document_boundaries and sentence.is_document_boundary: break
+                # get right context
+                while True:
+                    sentence = sentence.next_sentence()
+                    if sentence is None: break
+                    if self.respect_document_boundaries and sentence.is_document_boundary: break
 
-                right_context += ' ' + sentence.to_tokenized_string()
-                right_context = right_context.strip()
-                if len(right_context.split(" ")) > self.context_length:
-                    right_context = " ".join(right_context.split(" ")[:self.context_length])
-                    break
+                    right_context += ' ' + sentence.to_tokenized_string()
+                    right_context = right_context.strip()
+                    if len(right_context.split(" ")) > self.context_length:
+                        right_context = " ".join(right_context.split(" ")[:self.context_length])
+                        break
 
-            original_sentence.right_context = right_context
+                original_sentence.right_context = right_context
 
         left_context_split = left_context.split(" ")
         right_context_split = right_context.split(" ")
@@ -1219,11 +1223,18 @@ class TransformerWordEmbeddings(TokenEmbeddings):
         if left_context_split == [""]: left_context_split = []
         if right_context_split == [""]: right_context_split = []
 
-        # make expanded sentence
-        expanded_sentence = Sentence()
-        expanded_sentence.tokens = [Token(token) for token in left_context_split +
-                                    original_sentence.to_tokenized_string().split(" ") +
-                                    right_context_split]
+        if left_context_split or right_context_split:
+            if not hasattr(original_sentence, "context_sentence"):
+                # make expanded sentence
+                expanded_sentence = Sentence()
+                expanded_sentence.tokens = [Token(token) for token in left_context_split +
+                                            original_sentence.to_tokenized_string().split(" ") +
+                                            right_context_split]
+                original_sentence.context_sentence = expanded_sentence
+            else:
+                expanded_sentence = original_sentence.context_sentence
+        else:
+            expanded_sentence = original_sentence
 
         context_length = len(left_context_split)
         return expanded_sentence, context_length
