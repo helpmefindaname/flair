@@ -922,7 +922,9 @@ class ModelTrainer:
                 # forward pass
                 loss = self.model.forward_loss(batch)
                 if isinstance(loss, Tuple):
-                    loss = loss[0]
+                    loss, average_over = loss
+                else:
+                    average_over = 0
 
                 # update optimizer and scheduler
                 optimizer.zero_grad()
@@ -933,8 +935,12 @@ class ModelTrainer:
 
                 learning_rate = scheduler.get_lr()[0]
 
+                train_loss = loss.item()
+                if average_over != 0:
+                    train_loss /= average_over
+
                 # append current loss to list of losses for all iterations
-                loss_list.append(loss.item())
+                loss_list.append(train_loss)
 
                 # compute averaged loss
                 import statistics
@@ -949,6 +955,8 @@ class ModelTrainer:
                 if not best_loss or moving_avg_loss < best_loss:
                     best_loss = moving_avg_loss
 
+                log.info(f"lr: {learning_rate}, loss: {train_loss}, best_loss: {best_loss}, drop: {drop}")
+
                 if step > iterations:
                     break
 
@@ -959,7 +967,7 @@ class ModelTrainer:
                     break
 
                 with open(str(learning_rate_tsv), "a") as f:
-                    f.write(f"{step}\t{learning_rate}\t{loss.item()}\t{moving_avg_loss}\t{drop}\n")
+                    f.write(f"{step}\t{learning_rate}\t{train_loss}\t{moving_avg_loss}\t{drop}\n")
 
             self.model.load_state_dict(model_state)
             self.model.to(flair.device)
