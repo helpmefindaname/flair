@@ -945,12 +945,12 @@ class ModelTrainer:
                 loss_list.append(train_loss)
 
                 # compute averaged loss
+                if moving_avg_loss == 0:
+                    moving_avg_loss = train_loss
+
                 moving_avg_loss = (
                         smoothing_factor * moving_avg_loss
                         + (1 - smoothing_factor) * train_loss
-                )
-                smoothed_loss = moving_avg_loss / (
-                        1 - smoothing_factor ** (step + 1)
                 )
                 average_loss_list.append(moving_avg_loss)
 
@@ -959,10 +959,10 @@ class ModelTrainer:
                 else:
                     drop = 0.
 
-                if not best_loss or smoothed_loss < best_loss:
-                    best_loss = smoothed_loss
+                if not best_loss or moving_avg_loss < best_loss:
+                    best_loss = moving_avg_loss
 
-                log.info(f"lr: {learning_rate}, loss: {train_loss:.9f}, smooth_loss: {smoothed_loss:.3f}, best_loss: {best_loss:.3f}, drop: {drop:.3f}")
+                log.info(f"lr: {learning_rate}, loss: {train_loss:.9f}, smooth_loss: {moving_avg_loss:.3f}, best_loss: {best_loss:.3f}, drop: {drop:.3f}")
 
                 if step > iterations:
                     break
