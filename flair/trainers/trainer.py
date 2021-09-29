@@ -955,7 +955,7 @@ class ModelTrainer:
                 if not best_loss or moving_avg_loss < best_loss:
                     best_loss = moving_avg_loss
 
-                log.info(f"lr: {learning_rate}, loss: {train_loss}, best_loss: {best_loss}, drop: {drop}")
+                log.info(f"lr: {learning_rate}, loss: {train_loss:.9f}, mavg_loss: {moving_avg_loss:.3f}, best_loss: {best_loss:.3f}, drop: {drop:.3f}")
 
                 if step > iterations:
                     break
