@@ -933,6 +933,7 @@ class ModelTrainer:
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5.0)
                 optimizer.step()
                 scheduler.step()
+                store_embeddings(batch, "none")
 
                 learning_rate = scheduler.get_lr()[0]
 
