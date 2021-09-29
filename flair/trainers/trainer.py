@@ -884,11 +884,12 @@ class ModelTrainer:
             end_learning_rate: float = 10,
             iterations: int = 1000,
             stop_early: bool = True,
+            smoothing_factor: float = 0.98,
             file_name: str = "learning_rate.tsv",
             **kwargs,
     ) -> Path:
         best_loss = None
-
+        moving_avg_loss = 0
         # cast string to Path
         if type(base_path) is str:
             base_path = Path(base_path)
@@ -943,8 +944,13 @@ class ModelTrainer:
                 loss_list.append(train_loss)
 
                 # compute averaged loss
-                import statistics
-                moving_avg_loss = statistics.mean(loss_list)
+                moving_avg_loss = (
+                        smoothing_factor * moving_avg_loss
+                        + (1 - smoothing_factor) * train_loss
+                )
+                smoothed_loss = moving_avg_loss / (
+                        1 - smoothing_factor ** (step + 1)
+                )
                 average_loss_list.append(moving_avg_loss)
 
                 if len(average_loss_list) > 10:
@@ -952,10 +958,10 @@ class ModelTrainer:
                 else:
                     drop = 0.
 
-                if not best_loss or moving_avg_loss < best_loss:
-                    best_loss = moving_avg_loss
+                if not best_loss or smoothed_loss < best_loss:
+                    best_loss = smoothed_loss
 
-                log.info(f"lr: {learning_rate}, loss: {train_loss:.9f}, mavg_loss: {moving_avg_loss:.3f}, best_loss: {best_loss:.3f}, drop: {drop:.3f}")
+                log.info(f"lr: {learning_rate}, loss: {train_loss:.9f}, smooth_loss: {smoothed_loss:.3f}, best_loss: {best_loss:.3f}, drop: {drop:.3f}")
 
                 if step > iterations:
                     break
