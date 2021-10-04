@@ -25,6 +25,7 @@ class LanguageModel(nn.Module):
             nout=None,
             document_delimiter: str = '\n',
             dropout=0.1,
+            has_decoder=True,
     ):
 
         super(LanguageModel, self).__init__()
@@ -52,10 +53,13 @@ class LanguageModel(nn.Module):
         if nout is not None:
             self.proj = nn.Linear(hidden_size, nout)
             self.initialize(self.proj.weight)
-            self.decoder = nn.Linear(nout, len(dictionary))
+            hidden_size = nout
         else:
             self.proj = None
+        if has_decoder:
             self.decoder = nn.Linear(hidden_size, len(dictionary))
+        else:
+            self.decoder = None
 
         self.init_weights()
 
@@ -193,7 +197,7 @@ class LanguageModel(nn.Module):
         matrix.detach().uniform_(-stdv, stdv)
 
     @classmethod
-    def load_language_model(cls, model_file: Union[Path, str]):
+    def load_language_model(cls, model_file: Union[Path, str], has_decoder=True):
 
         state = torch.load(str(model_file), map_location=flair.device)
 
@@ -208,6 +212,7 @@ class LanguageModel(nn.Module):
             nout=state["nout"],
             document_delimiter=document_delimiter,
             dropout=state["dropout"],
+            has_decoder=state.get("has_decoder", True) and has_decoder
         )
         model.load_state_dict(state["state_dict"])
         model.eval()
@@ -412,7 +417,6 @@ class LanguageModel(nn.Module):
         # serialize the language models and the constructor arguments (but nothing else)
         model_state = {
             "state_dict": self.state_dict(),
-
             "dictionary": self.dictionary,
             "is_forward_lm": self.is_forward_lm,
             "hidden_size": self.hidden_size,
@@ -421,6 +425,7 @@ class LanguageModel(nn.Module):
             "nout": self.nout,
             "document_delimiter": self.document_delimiter,
             "dropout": self.dropout,
+            "has_decoder": self.decoder is not None
         }
 
         return model_state
@@ -440,6 +445,7 @@ class LanguageModel(nn.Module):
                 nout=d['nout'],
                 document_delimiter=d['document_delimiter'],
                 dropout=d['dropout'],
+                has_decoder=d.get('has_decoder', True)
             )
 
             language_model.load_state_dict(d['state_dict'])
