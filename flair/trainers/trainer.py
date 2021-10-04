@@ -727,6 +727,7 @@ class ModelTrainer:
                     log_line(log)
                     log.info("stopping training early, loss is too low")
                     log_line(log)
+                    break
 
             if use_swa:
                 optimizer.swap_swa_sgd()
