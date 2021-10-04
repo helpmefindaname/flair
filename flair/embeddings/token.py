@@ -211,7 +211,7 @@ class WordEmbeddings(TokenEmbeddings):
         if quantize:
             if alpha:
                 self.vectors = np.round(self.vectors / alpha).astype("int8")
-
+                self.alpha = np.array(alpha, dtype="float32")
             else:
                 self.vectors = self.vectors.astype("float16")
         self.vocab = {
