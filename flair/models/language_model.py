@@ -69,8 +69,9 @@ class LanguageModel(nn.Module):
     def init_weights(self):
         initrange = 0.1
         self.encoder.weight.detach().uniform_(-initrange, initrange)
-        self.decoder.bias.detach().fill_(0)
-        self.decoder.weight.detach().uniform_(-initrange, initrange)
+        if self.decoder is not None:
+            self.decoder.bias.detach().fill_(0)
+            self.decoder.weight.detach().uniform_(-initrange, initrange)
 
     def set_hidden(self, hidden):
         self.hidden = hidden
