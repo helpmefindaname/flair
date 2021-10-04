@@ -449,7 +449,7 @@ class LanguageModel(nn.Module):
                 has_decoder=d.get('has_decoder', True)
             )
 
-            language_model.load_state_dict(d['state_dict'])
+            language_model.load_state_dict(d['state_dict'], strict=d.get('has_decoder', True))
 
             # copy over state dictionary to self
             for key in language_model.__dict__.keys():
