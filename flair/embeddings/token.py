@@ -211,6 +211,7 @@ class WordEmbeddings(TokenEmbeddings):
         if quantize:
             if alpha:
                 self.vectors = np.round(self.vectors / alpha).astype("int8")
+
             else:
                 self.vectors = self.vectors.astype("float16")
         self.vocab = {
@@ -246,7 +247,7 @@ class WordEmbeddings(TokenEmbeddings):
     def get_vec(self, word: str) -> torch.Tensor:
         word_embedding = self.vectors[self.get_cached_token_index(word)]
         if self.alpha:
-            word_embedding *= self.alpha
+            word_embedding = self.alpha * word_embedding
 
         word_embedding = torch.tensor(
             word_embedding.tolist(), device=flair.device, dtype=torch.float
