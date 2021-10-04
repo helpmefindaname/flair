@@ -203,7 +203,7 @@ class LanguageModel(nn.Module):
         state = torch.load(str(model_file), map_location=flair.device)
 
         document_delimiter = state["document_delimiter"] if "document_delimiter" in state else '\n'
-
+        has_decoder = state.get("has_decoder", True) and has_decoder
         model = LanguageModel(
             dictionary=state["dictionary"],
             is_forward_lm=state["is_forward_lm"],
@@ -213,9 +213,9 @@ class LanguageModel(nn.Module):
             nout=state["nout"],
             document_delimiter=document_delimiter,
             dropout=state["dropout"],
-            has_decoder=state.get("has_decoder", True) and has_decoder
+            has_decoder=has_decoder
         )
-        model.load_state_dict(state["state_dict"])
+        model.load_state_dict(state["state_dict"], strict=has_decoder)
         model.eval()
         model.to(flair.device)
 
