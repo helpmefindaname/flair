@@ -119,6 +119,7 @@ class ModelTrainer:
             optimizer_state_dict: Optional = None,
             scheduler_state_dict: Optional = None,
             save_optimizer_state: bool = False,
+            min_loss: Optional[float] = None,
             **kwargs,
     ) -> dict:
         """
@@ -165,6 +166,7 @@ class ModelTrainer:
         :param use_tensorboard: If True, writes out tensorboard information
         :param tensorboard_log_dir: Directory into which tensorboard log files will be written
         :param metrics_for_tensorboard: List of tuples that specify which metrics (in addition to the main_score) shall be plotted in tensorboard, could be [("macro avg", 'f1-score'), ("macro avg", 'precision')] for example
+        :param min_loss: if provided, the training stops as soon as the training loss is as low as the given value
         :param kwargs: Other arguments for the Optimizer
         :return:
         """
@@ -727,6 +729,11 @@ class ModelTrainer:
             # if we do not use dev data for model selection, save final model
             if save_final_model and not param_selection_mode:
                 self.model.save(base_path / "final-model.pt", checkpoint=save_optimizer_state)
+
+            if min_loss is not None and train_loss < min_loss:
+                log_line(log)
+                log.info("stopping training early, loss is too low")
+                log_line(log)
 
         except KeyboardInterrupt:
             log_line(log)
