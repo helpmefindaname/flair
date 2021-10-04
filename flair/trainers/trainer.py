@@ -186,6 +186,7 @@ class ModelTrainer:
         training_parameters = {}
         for parameter in signature(self.train).parameters:
             training_parameters[parameter] = local_variables[parameter]
+        del training_parameters["base_path"]
         model_card['training_parameters'] = training_parameters
 
         # add model card to model
