@@ -16,15 +16,15 @@ class LanguageModel(nn.Module):
     """Container module with an encoder, a recurrent module, and a decoder."""
 
     def __init__(
-        self,
-        dictionary: Dictionary,
-        is_forward_lm: bool,
-        hidden_size: int,
-        nlayers: int,
-        embedding_size: int = 100,
-        nout=None,
-        document_delimiter: str = '\n',
-        dropout=0.1,
+            self,
+            dictionary: Dictionary,
+            is_forward_lm: bool,
+            hidden_size: int,
+            nlayers: int,
+            embedding_size: int = 100,
+            nout=None,
+            document_delimiter: str = '\n',
+            dropout=0.1,
     ):
 
         super(LanguageModel, self).__init__()
@@ -71,28 +71,36 @@ class LanguageModel(nn.Module):
     def set_hidden(self, hidden):
         self.hidden = hidden
 
-    def forward(self, input, hidden, ordered_sequence_lengths=None):
+    def forward(self, input, hidden, ordered_sequence_lengths=None, decode=True):
         encoded = self.encoder(input)
-        emb = self.drop(encoded)
+        if self.drop:
+            emb = self.drop(encoded)
+        else:
+            emb = encoded
 
-        self.rnn.flatten_parameters()
+        if hasattr(self.rnn, "flatten_parameters"):
+            self.rnn.flatten_parameters()
 
         output, hidden = self.rnn(emb, hidden)
 
         if self.proj is not None:
             output = self.proj(output)
 
-        output = self.drop(output)
+        if self.drop:
+            output = self.drop(output)
 
-        decoded = self.decoder(
-            output.view(output.size(0) * output.size(1), output.size(2))
-        )
+        if decode:
+            decoded = self.decoder(
+                output.view(output.size(0) * output.size(1), output.size(2))
+            )
 
-        return (
-            decoded.view(output.size(0), output.size(1), decoded.size(1)),
-            output,
-            hidden,
-        )
+            return (
+                decoded.view(output.size(0), output.size(1), decoded.size(1)),
+                output,
+                hidden,
+            )
+        else:
+            return output, hidden
 
     def init_hidden(self, bsz):
         weight = next(self.parameters()).detach()
@@ -102,11 +110,11 @@ class LanguageModel(nn.Module):
         )
 
     def get_representation(
-        self,
-        strings: List[str],
-        start_marker: str,
-        end_marker: str,
-        chars_per_chunk: int = 512,
+            self,
+            strings: List[str],
+            start_marker: str,
+            end_marker: str,
+            chars_per_chunk: int = 512,
     ):
 
         len_longest_str: int = len(max(strings, key=len))
@@ -154,7 +162,7 @@ class LanguageModel(nn.Module):
         output_parts = []
         for batch in batches:
             batch = batch.transpose(0, 1)
-            _, rnn_output, hidden = self.forward(batch, hidden)
+            rnn_output, _ = self.forward(batch, hidden, decode=False)
             output_parts.append(rnn_output)
 
         # concatenate all chunks to make final output
@@ -167,7 +175,7 @@ class LanguageModel(nn.Module):
         input_vector = torch.LongTensor([char_indices]).transpose(0, 1)
 
         hidden = self.init_hidden(1)
-        prediction, rnn_output, hidden = self.forward(input_vector, hidden)
+        _, hidden = self.forward(input_vector, hidden, decode=False)
 
         return self.repackage_hidden(hidden)
 
@@ -243,7 +251,7 @@ class LanguageModel(nn.Module):
         }
 
     def save_checkpoint(
-        self, file: Union[Path, str], optimizer: Optimizer, epoch: int, split: int, loss: float
+            self, file: Union[Path, str], optimizer: Optimizer, epoch: int, split: int, loss: float
     ):
         model_state = {
             "state_dict": self.state_dict(),
@@ -279,11 +287,11 @@ class LanguageModel(nn.Module):
         torch.save(model_state, str(file), pickle_protocol=4)
 
     def generate_text(
-        self,
-        prefix: str = "\n",
-        number_of_characters: int = 1000,
-        temperature: float = 1.0,
-        break_on_suffix=None,
+            self,
+            prefix: str = "\n",
+            number_of_characters: int = 1000,
+            temperature: float = 1.0,
+            break_on_suffix=None,
     ) -> Tuple[str, float]:
 
         if prefix == "":
@@ -303,8 +311,8 @@ class LanguageModel(nn.Module):
                 for character in prefix[:-1]:
                     char_tensors.append(
                         torch.tensor(self.dictionary.get_idx_for_item(character))
-                        .unsqueeze(0)
-                        .unsqueeze(0)
+                            .unsqueeze(0)
+                            .unsqueeze(0)
                     )
 
                 input = torch.cat(char_tensors).to(flair.device)
@@ -313,8 +321,8 @@ class LanguageModel(nn.Module):
 
             input = (
                 torch.tensor(self.dictionary.get_idx_for_item(prefix[-1]))
-                .unsqueeze(0)
-                .unsqueeze(0)
+                    .unsqueeze(0)
+                    .unsqueeze(0)
             )
 
             log_prob = 0.0
