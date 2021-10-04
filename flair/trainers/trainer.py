@@ -723,6 +723,11 @@ class ModelTrainer:
                     model_name = "model_epoch_" + str(epoch) + ".pt"
                     self.model.save(base_path / model_name, checkpoint=save_optimizer_state)
 
+                if min_loss is not None and train_loss < min_loss:
+                    log_line(log)
+                    log.info("stopping training early, loss is too low")
+                    log_line(log)
+
             if use_swa:
                 optimizer.swap_swa_sgd()
 
@@ -730,10 +735,6 @@ class ModelTrainer:
             if save_final_model and not param_selection_mode:
                 self.model.save(base_path / "final-model.pt", checkpoint=save_optimizer_state)
 
-            if min_loss is not None and train_loss < min_loss:
-                log_line(log)
-                log.info("stopping training early, loss is too low")
-                log_line(log)
 
         except KeyboardInterrupt:
             log_line(log)
@@ -969,7 +970,8 @@ class ModelTrainer:
                 if not best_loss or moving_avg_loss < best_loss:
                     best_loss = moving_avg_loss
 
-                log.info(f"lr: {learning_rate}, loss: {train_loss:.9f}, smooth_loss: {moving_avg_loss:.3f}, best_loss: {best_loss:.3f}, drop: {drop:.3f}")
+                log.info(
+                    f"lr: {learning_rate}, loss: {train_loss:.9f}, smooth_loss: {moving_avg_loss:.3f}, best_loss: {best_loss:.3f}, drop: {drop:.3f}")
 
                 if step > iterations:
                     break
