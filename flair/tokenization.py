@@ -180,7 +180,7 @@ class JapaneseTokenizer(Tokenizer):
             https://github.com/himkt/konoha
     """
 
-    def __init__(self, tokenizer: str, sudachi_mode: str = "A"):
+    def __init__(self, tokenizer: str, sudachi_mode: str = "A", with_postag: bool = False):
         super(JapaneseTokenizer, self).__init__()
 
         available_tokenizers = ["mecab", "janome", "sudachi"]
@@ -205,16 +205,17 @@ class JapaneseTokenizer(Tokenizer):
 
         self.tokenizer = tokenizer
         self.sentence_tokenizer = konoha.SentenceTokenizer()
-        self.word_tokenizer = konoha.WordTokenizer(tokenizer, mode=sudachi_mode)
+        self.word_tokenizer = konoha.WordTokenizer(tokenizer, mode=sudachi_mode, with_postag=with_postag)
+        self.with_postag = with_postag
 
     def tokenize(self, text: str) -> List[Token]:
+        from konoha.data.token import Token as KonohaToken
         tokens: List[Token] = []
-        words: List[str] = []
+        words: List[KonohaToken] = []
 
         sentences = self.sentence_tokenizer.tokenize(text)
         for sentence in sentences:
-            konoha_tokens = self.word_tokenizer.tokenize(sentence)
-            words.extend(list(map(str, konoha_tokens)))
+            words.extend(self.word_tokenizer.tokenize(sentence))
 
         # determine offsets for whitespace_after field
         index = text.index
@@ -222,8 +223,9 @@ class JapaneseTokenizer(Tokenizer):
         previous_word_offset = -1
         previous_token = None
         for word in words:
+            word_text = word.surface
             try:
-                word_offset = index(word, current_offset)
+                word_offset = index(word_text, current_offset)
                 start_position = word_offset
             except:
                 word_offset = previous_word_offset + 1
@@ -232,14 +234,22 @@ class JapaneseTokenizer(Tokenizer):
                 )
 
             token = Token(
-                text=word, start_position=start_position, whitespace_after=True
+                text=word_text, start_position=start_position, whitespace_after=True
             )
+            if self.with_postag:
+                token.set_label("pos1", word.postag)
+                token.set_label("pos2", word.postag2)
+                token.set_label("pos3", word.postag3)
+                token.set_label("pos4", word.postag4)
+                token.set_label("inflection", word.inflection)
+                token.set_label("conjugation", word.conjugation)
+
             tokens.append(token)
 
             if (previous_token is not None) and word_offset - 1 == previous_word_offset:
                 previous_token.whitespace_after = False
 
-            current_offset = word_offset + len(word)
+            current_offset = word_offset + len(word_text)
             previous_word_offset = current_offset - 1
             previous_token = token
 

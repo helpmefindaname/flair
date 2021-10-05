@@ -1322,7 +1322,7 @@ class Corpus:
 
     @staticmethod
     def _obtain_statistics_for(sentences, name, tag_type) -> dict:
-        if len(sentences) == 0:
+        if sentences is None or len(sentences) == 0:
             return {}
 
         classes_to_count = Corpus._count_sentence_labels(sentences)
