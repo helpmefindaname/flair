@@ -18,6 +18,7 @@ import flair.nn
 from flair.data import Dictionary, Sentence, Label
 from flair.datasets import SentenceDataset, DataLoader
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, Embeddings
+from flair.embeddings.base import load_embedding
 from flair.file_utils import cached_path, unzip_file
 from flair.training_utils import store_embeddings
 
@@ -231,7 +232,7 @@ class SequenceTagger(flair.nn.Classifier):
     def _get_state_dict(self):
         model_state = {
             "state_dict": self.state_dict(),
-            "embeddings": self.embeddings,
+            "embeddings": self.embeddings.save_embedding(use_state_dict=False),
             "hidden_size": self.hidden_size,
             "train_initial_hidden_state": self.train_initial_hidden_state,
             "tag_dictionary": self.tag_dictionary,
@@ -252,6 +253,10 @@ class SequenceTagger(flair.nn.Classifier):
     @staticmethod
     def _init_model_with_state_dict(state):
 
+        embeddings = state["embeddings"]
+        if isinstance(embeddings, dict):
+            embeddings = load_embedding(embeddings)
+
         rnn_type = "LSTM" if "rnn_type" not in state.keys() else state["rnn_type"]
         use_dropout = 0.0 if "use_dropout" not in state.keys() else state["use_dropout"]
         use_word_dropout = 0.0 if "use_word_dropout" not in state.keys() else state["use_word_dropout"]
@@ -270,7 +275,7 @@ class SequenceTagger(flair.nn.Classifier):
 
         model = SequenceTagger(
             hidden_size=state["hidden_size"],
-            embeddings=state["embeddings"],
+            embeddings=embeddings,
             tag_dictionary=state["tag_dictionary"],
             tag_type=state["tag_type"],
             use_crf=state["use_crf"],
@@ -285,6 +290,9 @@ class SequenceTagger(flair.nn.Classifier):
             loss_weights=weights,
             reproject_embeddings=reproject_embeddings,
         )
+        if "quantized" in state and state["quantized"]:
+            model.quantize()
+
         model.load_state_dict(state["state_dict"])
         return model
 
@@ -312,7 +320,7 @@ class SequenceTagger(flair.nn.Classifier):
         you wish to not only predict, but also keep the generated embeddings in CPU or GPU memory respectively.
         'gpu' to store embeddings in GPU memory.
         """
-        if label_name == None:
+        if label_name is None:
             label_name = self.tag_type
 
         with torch.no_grad():

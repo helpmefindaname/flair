@@ -204,7 +204,7 @@ class LanguageModel(nn.Module):
 
         document_delimiter = state["document_delimiter"] if "document_delimiter" in state else '\n'
         has_decoder = state.get("has_decoder", True) and has_decoder
-        model = LanguageModel(
+        model = cls(
             dictionary=state["dictionary"],
             is_forward_lm=state["is_forward_lm"],
             hidden_size=state["hidden_size"],
@@ -234,7 +234,7 @@ class LanguageModel(nn.Module):
             state["optimizer_state_dict"] if "optimizer_state_dict" in state else None
         )
 
-        model = LanguageModel(
+        model = cls(
             dictionary=state["dictionary"],
             is_forward_lm=state["is_forward_lm"],
             hidden_size=state["hidden_size"],

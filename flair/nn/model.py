@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Union, List, Tuple, Dict, Optional
 
 import torch.nn
+from torch import nn
+from torch.quantization import DEFAULT_DYNAMIC_QUANT_MODULE_MAPPINGS, default_dynamic_qconfig, \
+    float_qparams_weight_only_qconfig
+import torch.nn.quantized as nnq
 from torch.utils.data.dataset import Dataset
 from tqdm import tqdm
 
@@ -22,6 +26,8 @@ log = logging.getLogger("flair")
 class Model(torch.nn.Module):
     """Abstract base class for all downstream task models in Flair, such as SequenceTagger and TextClassifier.
     Every new type of model must implement these methods."""
+
+    quantized = False
 
     @property
     @abstractmethod
@@ -74,6 +80,24 @@ class Model(torch.nn.Module):
     def _fetch_model(model_name) -> str:
         return model_name
 
+    def quantize(self):
+
+        DEFAULT_DYNAMIC_QUANT_MODULE_MAPPINGS[nn.Embedding] = nnq.Embedding
+        torch.quantization.quantize_dynamic(
+            self,
+            inplace=True,
+            qconfig_spec={
+                nn.Linear: default_dynamic_qconfig,
+                nn.LSTM: default_dynamic_qconfig,
+                nn.GRU: default_dynamic_qconfig,
+                nn.LSTMCell: default_dynamic_qconfig,
+                nn.RNNCell: default_dynamic_qconfig,
+                nn.GRUCell: default_dynamic_qconfig,
+                nn.Embedding: float_qparams_weight_only_qconfig,
+            }
+        )
+        self.quantized = True
+
     def save(self, model_file: Union[str, Path], checkpoint: bool = False):
         """
         Saves the current model to the provided file.
@@ -106,6 +130,7 @@ class Model(torch.nn.Module):
                     training_parameters['scheduler'] = scheduler.__class__
 
             model_state['model_card'] = self.model_card
+        model_state['quantized'] = self.quantized
 
         # save model
         torch.save(model_state, str(model_file), pickle_protocol=4)

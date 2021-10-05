@@ -17,7 +17,7 @@ from transformers import AutoTokenizer, AutoConfig, AutoModel, CONFIG_MAPPING, P
 
 import flair
 from flair.data import Sentence, Token, Corpus, Dictionary
-from flair.embeddings.base import Embeddings
+from flair.embeddings.base import Embeddings, register_embedding, load_embedding
 from flair.file_utils import cached_path, open_inside_zip, instance_lru_cache
 
 log = logging.getLogger("flair")
@@ -47,6 +47,7 @@ class TokenEmbeddings(Embeddings):
         return instance_parameters
 
 
+@register_embedding
 class StackedEmbeddings(TokenEmbeddings):
     """A stack of embeddings, used if you need to combine several different embedding types."""
 
@@ -115,7 +116,24 @@ class StackedEmbeddings(TokenEmbeddings):
 
         return named_embeddings_dict
 
+    @classmethod
+    def from_params(cls, params):
+        embeddings = [
+            load_embedding(p)
+            for p in params["embeddings"]
+        ]
+        return cls(embeddings=embeddings)
 
+    def to_params(self):
+        return {
+            "embeddings": [
+                emb.save_embedding(use_state_dict=False)
+                for emb in self.embeddings
+            ]
+        }
+
+
+@register_embedding
 class WordEmbeddings(TokenEmbeddings):
     """Standard static word embeddings, such as GloVe or FastText."""
 
@@ -392,6 +410,7 @@ class CharacterEmbeddings(TokenEmbeddings):
         return self.name
 
 
+@register_embedding
 class FlairEmbeddings(TokenEmbeddings):
     """Contextual string embeddings of words, as proposed in Akbik et al., 2018."""
 
@@ -707,6 +726,32 @@ class FlairEmbeddings(TokenEmbeddings):
     def __str__(self):
         return self.name
 
+    def to_params(self):
+        return {
+            "fine_tune": self.fine_tune,
+            "chars_per_chunk": self.chars_per_chunk,
+            "is_lower": self.is_lower,
+            "tokenized_lm": self.tokenized_lm,
+            "model_params": {
+                "dictionary": self.lm.dictionary,
+                "is_forward_lm": self.lm.is_forward_lm,
+                "hidden_size": self.lm.hidden_size,
+                "nlayers": self.lm.nlayers,
+                "embedding_size": self.lm.embedding_size,
+                "nout": self.lm.nout,
+                "document_delimiter": self.lm.document_delimiter,
+                "dropout": self.lm.dropout,
+                "has_decoder": self.lm.decoder is not None
+            }
+        }
+
+    @classmethod
+    def from_params(cls, params):
+        model_params = params.pop("model_params")
+        from flair.models import LanguageModel
+        lm = LanguageModel(**model_params)
+        return cls(lm, **params)
+
 
 class PooledFlairEmbeddings(TokenEmbeddings):
     def __init__(
@@ -979,7 +1024,6 @@ class TransformerWordEmbeddings(TokenEmbeddings):
         context_offsets = []
 
         for sentence in sentences:
-
             # create expanded sentence and remember context offsets
             expanded_sentence, context_offset = self._expand_sentence_with_context(sentence)
             expanded_sentences.append(expanded_sentence)

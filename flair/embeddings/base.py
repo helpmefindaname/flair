@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Type
 from torch.nn import ParameterList, Parameter
 
 import torch
@@ -74,6 +74,48 @@ class Embeddings(torch.nn.Module):
 
     def get_named_embeddings_dict(self) -> Dict:
         return {self.name: self}
+
+    @classmethod
+    def from_params(cls, params):
+        obj = cls.__new__(cls)
+        obj.__setstate__(params)
+        return obj
+
+    @classmethod
+    def load_embedding(cls, params: dict):
+        state_dict = params.pop("state_dict", None)
+
+        embedding = cls.from_params(params)
+        if state_dict is not None:
+            embedding.load_state_dict(state_dict)
+        return embedding
+
+    def to_params(self):
+        return self.__getstate__()
+
+    def __getstate__(self):
+        return self.__dict__.copy()
+
+    def save_embedding(self, use_state_dict: bool = True):
+        params = self.to_params()
+        if use_state_dict:
+            params["state_dict"] = self.state_dict()
+        params["__cls__"] = self.__class__.__name__
+        return params
+
+
+EMBEDDING_CLASSES: Dict[str, Type[Embeddings]] = {}
+
+
+def register_embedding(cls):
+    EMBEDDING_CLASSES[cls.__name__] = cls
+    return cls
+
+
+def load_embedding(params: dict) -> Embeddings:
+    cls_name = params.pop("__cls__")
+    cls = EMBEDDING_CLASSES[cls_name]
+    return cls.load_embedding(params)
 
 
 class ScalarMix(torch.nn.Module):
