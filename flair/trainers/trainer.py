@@ -445,7 +445,7 @@ class ModelTrainer:
                 train_loss, learning_rate, momentum = self._process_batch(
                     batch_loader, optimizer, micro_batch_size, use_amp, cycle_momentum,
                     embeddings_storage_mode, epoch, mini_batch_size, param_selection_mode, write_weights,
-                    weight_extractor, learning_rate, momentum
+                    weight_extractor, learning_rate, momentum, scheduler
                 )
 
                 self.model.eval()
@@ -977,7 +977,7 @@ class ModelTrainer:
 
     def _process_batch(self, batch_loader, optimizer, micro_batch_size, use_amp, cycle_momentum,
                        embeddings_storage_mode, epoch, mini_batch_size, param_selection_mode, write_weights,
-                       weight_extractor, learning_rate, momentum):
+                       weight_extractor, learning_rate, momentum, scheduler):
 
         self.model.train()
 
