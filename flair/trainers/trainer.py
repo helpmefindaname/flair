@@ -330,7 +330,7 @@ class ModelTrainer:
         weight_extractor = WeightExtractor(base_path)
 
         optimizer = self._create_optimizer(optimizer, use_swa, learning_rate, kwargs)
-        optimizer = self._init_amp(use_amp, amp, optimizer, amp_opt_level)
+        optimizer = self._init_amp(use_amp, optimizer, amp, amp_opt_level)
 
         # load existing optimizer state dictionary if it exists
         if optimizer_state_dict:
