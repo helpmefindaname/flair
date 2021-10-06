@@ -428,7 +428,7 @@ class ModelTrainer:
                     writer.add_scalar("learning_rate", learning_rate, epoch)
 
                 # stop training if learning rate becomes too small
-                if isinstance(scheduler, AnnealOnPlateau and learning_rate < min_learning_rate):
+                if isinstance(scheduler, AnnealOnPlateau) and learning_rate < min_learning_rate:
                     log_line(log)
                     log.info("learning rate too small - quitting training!")
                     log_line(log)
