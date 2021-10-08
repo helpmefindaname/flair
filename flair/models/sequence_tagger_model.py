@@ -17,9 +17,10 @@ from tqdm import tqdm
 import flair.nn
 from flair.data import Dictionary, Sentence, Label
 from flair.datasets import SentenceDataset, DataLoader
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, Embeddings
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings
 from flair.embeddings.base import load_embedding
 from flair.file_utils import cached_path, unzip_file
+from flair.nn.auxilary_loss import AuxilaryLoss
 from flair.training_utils import store_embeddings
 
 log = logging.getLogger("flair")
@@ -84,6 +85,7 @@ class SequenceTagger(flair.nn.Classifier):
             rnn_type: str = "LSTM",
             beta: float = 1.0,
             loss_weights: Dict[str, float] = None,
+            auxilary_losses: List[AuxilaryLoss] = [],
     ):
         """
         Initializes a SequenceTagger
@@ -226,6 +228,8 @@ class SequenceTagger(flair.nn.Classifier):
             self.transitions.detach()[
             :, self.tag_dictionary.get_idx_for_item(STOP_TAG)
             ] = -10000
+
+        self.auxilary_losses = auxilary_losses
 
         self.to(flair.device)
 
@@ -400,7 +404,12 @@ class SequenceTagger(flair.nn.Classifier):
             self, data_points: Union[List[Sentence], Sentence], sort=True
     ) -> torch.tensor:
         features = self.forward(data_points)
-        return self._calculate_loss(features, data_points)
+        loss, count = self._calculate_loss(features, data_points)
+        if self.training:
+            for auxilary_loss in self.auxilary_losses:
+                loss += auxilary_loss.forward_loss(features, data_points)
+
+        return loss, count
 
     def forward(self, sentences: List[Sentence]):
 
@@ -478,9 +487,7 @@ class SequenceTagger(flair.nn.Classifier):
             if self.use_locked_dropout > 0.0:
                 sentence_tensor = self.locked_dropout(sentence_tensor)
 
-        features = self.linear(sentence_tensor)
-
-        return features
+        return sentence_tensor
 
     def _score_sentence(self, feats, tags, lens_):
 
@@ -518,6 +525,8 @@ class SequenceTagger(flair.nn.Classifier):
     def _calculate_loss(
             self, features: torch.tensor, sentences: List[Sentence]
     ) -> Tuple[float, int]:
+
+        features = self.linear(features)
 
         lengths: List[int] = [len(sentence.tokens) for sentence in sentences]
 
@@ -570,7 +579,7 @@ class SequenceTagger(flair.nn.Classifier):
          - The second list contains a probability distribution over all `Labels` for each token
            in a sentence for all sentences.
         """
-
+        feature = self.linear(feature)
         lengths: List[int] = [len(sentence.tokens) for sentence in batch_sentences]
 
         tags = []
