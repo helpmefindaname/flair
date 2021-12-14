@@ -17,15 +17,6 @@ else:
 # global variable: embedding_storage_mode
 embedding_storage_mode = "default"
 
-
-from . import (  # noqa: E402 import after setting device
-    data,
-    models,
-    nn,
-    trainers,
-    visual,
-)
-
 __version__ = "0.10"
 
 logging.config.dictConfig(

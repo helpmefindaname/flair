@@ -489,6 +489,7 @@ class ModelTrainer:
                         else:
                             loss.backward()
                         train_loss += loss.item()
+                        store_embeddings(batch_step, embeddings_storage_mode)
 
                     # do the optimizer step
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5.0)
@@ -509,7 +510,6 @@ class ModelTrainer:
 
                     # depending on memory mode, embeddings are moved to CPU, GPU
                     # or deleted
-                    store_embeddings(batch, embeddings_storage_mode)
 
                     batch_time += time.time() - start_time
                     if seen_batches % modulo == 0:
