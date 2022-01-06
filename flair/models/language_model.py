@@ -76,12 +76,7 @@ class LanguageModel(nn.Module):
         if hasattr(self.rnn, "flatten_parameters"):
             self.rnn.flatten_parameters()
 
-        if isinstance(hidden, tuple) and len(hidden) == 1:
-            hidden = hidden[0]
-
         output, hidden = self.rnn(emb, hidden)
-        if not isinstance(hidden, tuple):
-            hidden = (hidden,)
 
         if self.proj is not None:
             output = self.proj(output)
