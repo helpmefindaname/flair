@@ -889,6 +889,19 @@ class Sentence(DataPoint):
                 list.append(all_tags)
         return " ".join(list)
 
+    def to_full_tagged_tokens(self, main_tag=None) -> List[str]:
+        tags = []
+        for token in self.tokens:
+            tags.append(token.text)
+
+            for label_type in token.annotation_layers.keys():
+
+                if main_tag is not None and main_tag != label_type:
+                    continue
+
+                tags.append(token.get_labels(label_type)[0].value)
+        return tags
+
     def to_tokenized_string(self) -> str:
 
         if self.tokenized is None:
@@ -1411,12 +1424,12 @@ class Corpus:
             _len_dataset(self.test) if self.test else 0,
         )
 
-    def make_label_dictionary(self, label_type: str) -> Dictionary:
+    def make_label_dictionary(self, label_type: str, add_unk: bool = True) -> Dictionary:
         """
         Creates a dictionary of all labels assigned to the sentences in the corpus.
         :return: dictionary of labels
         """
-        label_dictionary: Dictionary = Dictionary(add_unk=True)
+        label_dictionary: Dictionary = Dictionary(add_unk=add_unk)
 
         assert self.train
         datasets = [self.train]

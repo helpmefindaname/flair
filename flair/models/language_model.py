@@ -97,16 +97,9 @@ class LanguageModel(nn.Module):
             weight.new(self.nlayers, bsz, self.hidden_size).zero_().clone().detach(),
         )
 
-    def get_representation(
-        self,
-        strings: List[str],
-        start_marker: str,
-        end_marker: str,
-        chars_per_chunk: int = 512,
-    ):
+    def _pad_strings(self, strings: List[str], start_marker: str, end_marker: str):
 
         len_longest_str: int = len(max(strings, key=len))
-
         # pad strings with whitespaces to longest sentence
         padded_strings: List[str] = []
 
@@ -116,18 +109,20 @@ class LanguageModel(nn.Module):
 
             padded = f"{start_marker}{string}{end_marker}"
             padded_strings.append(padded)
+        longest_padded_str: int = len_longest_str + len(start_marker) + len(end_marker)
+        return padded_strings, longest_padded_str
 
-        # cut up the input into chunks of max charlength = chunk_size
+    def _split_chunks(self, strings: List[str], max_length: int, chars_per_chunk: int):
         chunks = []
         splice_begin = 0
-        longest_padded_str: int = len_longest_str + len(start_marker) + len(end_marker)
-        for splice_end in range(chars_per_chunk, longest_padded_str, chars_per_chunk):
-            chunks.append([text[splice_begin:splice_end] for text in padded_strings])
+        for splice_end in range(chars_per_chunk, max_length, chars_per_chunk):
+            chunks.append([text[splice_begin:splice_end] for text in strings])
             splice_begin = splice_end
 
-        chunks.append([text[splice_begin:longest_padded_str] for text in padded_strings])
-        hidden = self.init_hidden(len(chunks[0]))
+        chunks.append([text[splice_begin:max_length] for text in strings])
+        return chunks
 
+    def _chunks_to_batches(self, chunks: List[str]) -> List[torch.Tensor]:
         padding_char_index = self.dictionary.get_idx_for_item(" ")
 
         batches: List[torch.Tensor] = []
@@ -142,12 +137,56 @@ class LanguageModel(nn.Module):
                 sequences_as_char_indices.append(char_indices)
             t = torch.tensor(sequences_as_char_indices, dtype=torch.long).to(device=flair.device, non_blocking=True)
             batches.append(t)
+        return batches
+
+    def get_representation(
+        self,
+        strings: List[str],
+        start_marker: str,
+        end_marker: str,
+        chars_per_chunk: int = 512,
+    ):
+
+        padded_strings, longest_padded_str = self._pad_strings(strings, start_marker, end_marker)
+
+        # cut up the input into chunks of max charlength = chunk_size
+        chunks = self._split_chunks(padded_strings, longest_padded_str, chars_per_chunk)
+        hidden = self.init_hidden(len(chunks[0]))
+
+        batches = self._chunks_to_batches(chunks)
 
         output_parts = []
         for batch in batches:
             batch = batch.transpose(0, 1)
             _, rnn_output, hidden = self.forward(batch, hidden)
             output_parts.append(rnn_output)
+
+        # concatenate all chunks to make final output
+        output = torch.cat(output_parts)
+
+        return output
+
+    def get_predictions(
+        self,
+        strings: List[str],
+        start_marker: str,
+        end_marker: str,
+        chars_per_chunk: int = 512,
+    ):
+
+        padded_strings, longest_padded_str = self._pad_strings(strings, start_marker, end_marker)
+
+        # cut up the input into chunks of max charlength = chunk_size
+        chunks = self._split_chunks(padded_strings, longest_padded_str, chars_per_chunk)
+        hidden = self.init_hidden(len(chunks[0]))
+
+        batches = self._chunks_to_batches(chunks)
+
+        output_parts = []
+        for batch in batches:
+            batch = batch.transpose(0, 1)
+            pred, _, hidden = self.forward(batch, hidden)
+            output_parts.append(pred)
 
         # concatenate all chunks to make final output
         output = torch.cat(output_parts)
